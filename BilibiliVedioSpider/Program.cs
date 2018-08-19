@@ -18,12 +18,12 @@ namespace BilibiliVedioSpider
         private static IConfigurationRoot _config;
         private static bool _isAsync;
         private static string _cookie;
-        private static string[] _unValidPathPart = new string[] { "\\","/",":","*","?","\"","<",">","|"};
+        private static string[] _unValidPathPart = new string[] { "\\", "/", ":", "*", "?", "\"", "<", ">", "|" };
 
         static async Task Main(string[] args)
         {
-            
-			Console.WriteLine("开始下载！");
+
+            Console.WriteLine("开始下载！");
             _config = new ConfigurationBuilder()
                 .AddJsonFile("appsetting.json", optional: false)
                 .Build();
@@ -42,8 +42,8 @@ namespace BilibiliVedioSpider
                     await StartProcessAsync(bilibiliUrl);
                 }
             }
-			Console.WriteLine("处理完成！");
-			Console.ReadKey();
+            Console.WriteLine("处理完成！");
+            Console.ReadKey();
         }
 
         private static async Task StartProcessAsync(string bilibiliUrl)
@@ -66,9 +66,9 @@ namespace BilibiliVedioSpider
             Regex pageDataRegex = new Regex("<script>window.__playinfo__=(.*?)</script>");
             var titleMatch = titleRegex.Match(pageStr);
             var pageDataMatch = pageDataRegex.Match(pageStr);
-            if (titleMatch.Groups.Count==1 || pageDataMatch.Groups.Count == 1)
+            if (titleMatch.Groups.Count == 1 || pageDataMatch.Groups.Count == 1)
             {
-                Console.WriteLine("不支持下载 "+ bilibiliUrl);
+                Console.WriteLine("不支持下载 " + bilibiliUrl);
                 return;
             }
             var title = ValidPath(titleMatch.Groups[1].Value);
@@ -93,7 +93,7 @@ namespace BilibiliVedioSpider
             //windows的路径不能是:\/:*?"<>|
             foreach (var item in _unValidPathPart)
             {
-                value = value.Replace(item,"");
+                value = value.Replace(item, "");
             }
             return value;
         }
@@ -176,9 +176,10 @@ namespace BilibiliVedioSpider
                     await DoRequestAsync(fs, from, to, url);
                     leftTotal -= sectionLen;
                     from += sectionLen;
+                    Console.WriteLine($"{realSaveFileName} 进度：{((totalLen - leftTotal) > totalLen ? totalLen : (totalLen - leftTotal))}/{totalLen}");
                 }
             }
-             
+
             sw.Stop();
             Console.WriteLine($"下载:{realSaveFileName},消耗秒数：{sw.Elapsed.TotalSeconds}");
         }
