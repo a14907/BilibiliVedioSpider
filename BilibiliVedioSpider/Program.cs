@@ -17,13 +17,18 @@ namespace BilibiliVedioSpider
         private static HttpClient _httpClient = new HttpClient();
         private static IConfigurationRoot _config;
         private static bool _isAsync;
+        private static string _cookie;
+        private static string[] _unValidPathPart = new string[] { "\\","/",":","*","?","\"","<",">","|"};
 
         static async Task Main(string[] args)
         {
+            
+			Console.WriteLine("开始下载！");
             _config = new ConfigurationBuilder()
                 .AddJsonFile("appsetting.json", optional: false)
                 .Build();
             _isAsync = bool.Parse(_config["IsAsync"]);
+            _cookie = _config["Cookie"];
 
             using (var streamReader = new StreamReader("vedio.txt"))
             {
@@ -37,12 +42,15 @@ namespace BilibiliVedioSpider
                     await StartProcessAsync(bilibiliUrl);
                 }
             }
+			Console.WriteLine("处理完成！");
+			Console.ReadKey();
         }
 
         private static async Task StartProcessAsync(string bilibiliUrl)
         {
             var reqMsg = new HttpRequestMessage(HttpMethod.Get, bilibiliUrl);
             reqMsg.Headers.AcceptEncoding.Add(new StringWithQualityHeaderValue("gzip", 1));
+            reqMsg.Headers.Add("Cookie", _cookie);
             var response = await _httpClient.SendAsync(reqMsg);
             var pageStream = await response.Content.ReadAsStreamAsync();
             var pageStr = string.Empty;
@@ -58,9 +66,15 @@ namespace BilibiliVedioSpider
             Regex pageDataRegex = new Regex("<script>window.__playinfo__=(.*?)</script>");
             var titleMatch = titleRegex.Match(pageStr);
             var pageDataMatch = pageDataRegex.Match(pageStr);
-            var title = titleMatch.Groups[1].Value;
+            if (titleMatch.Groups.Count==1 || pageDataMatch.Groups.Count == 1)
+            {
+                Console.WriteLine("不支持下载 "+ bilibiliUrl);
+                return;
+            }
+            var title = ValidPath(titleMatch.Groups[1].Value);
             var pageDataStr = pageDataMatch.Groups[1].Value;
 
+            Console.WriteLine($"{title}开始下载！");
             var jsonStr = pageDataStr;
             if (_isAsync)
             {
@@ -70,7 +84,18 @@ namespace BilibiliVedioSpider
             {
                 await StartProcessPageAsync(title, jsonStr);
             }
-            
+            Console.WriteLine($"{title}下载完成！");
+
+        }
+
+        private static string ValidPath(string value)
+        {
+            //windows的路径不能是:\/:*?"<>|
+            foreach (var item in _unValidPathPart)
+            {
+                value = value.Replace(item,"");
+            }
+            return value;
         }
 
         private static void StartProcessPage(string title, string jsonStr)
@@ -78,6 +103,7 @@ namespace BilibiliVedioSpider
             var saveFileDirectory = title + ".flv";
             var url = string.Empty;
             var pagedata = JsonConvert.DeserializeObject<PageData>(jsonStr);
+            Console.WriteLine($"{title} 的视频质量：{pagedata.quality}");
 
             var saveFileNameTemplate = saveFileDirectory.Replace(".flv", "{0}.flv");
 
@@ -176,7 +202,7 @@ namespace BilibiliVedioSpider
             msg.Headers.Add("Origin", "https://www.bilibili.com");
             msg.Headers.Add("Referer", "https://www.bilibili.com/video/av29705819");
             msg.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36");
-            msg.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(from, to);
+            msg.Headers.Range = new RangeHeaderValue(from, to);
 
 
             var response = await _httpClient.SendAsync(msg, HttpCompletionOption.ResponseHeadersRead);
